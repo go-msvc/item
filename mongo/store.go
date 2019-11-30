@@ -113,31 +113,41 @@ func (s mongoStore) Name() string {
 	return s.itemName
 }
 
-func (s mongoStore) Add(v interface{}) (store.ID, int, error) {
+func (s mongoStore) Type() reflect.Type {
+	return s.itemType
+}
+
+func (s mongoStore) Add(v interface{}) (store.ItemInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	info := store.ItemInfo{
+		Rev:       1,
+		Timestamp: time.Now().Truncate(time.Millisecond),
+		//UserID: ...,
+	}
 	result, err := s.collection.InsertOne(
 		ctx,
 		bson.M{
 			//"_id" is assigned by mongo
-			"rev":  1,
+			"rev":  info.Rev,
 			"id":   primitive.ObjectID{},
-			"ts":   time.Now().Truncate(time.Millisecond),
+			"ts":   info.Timestamp,
 			"user": primitive.ObjectID{},
 			"data": v,
 		})
 	if err != nil {
-		return "", 0, errors.Wrapf(err, "failed to insert into mongo")
+		return store.ItemInfo{}, errors.Wrapf(err, "failed to insert into mongo")
 	}
 
 	oid, ok := result.InsertedID.(primitive.ObjectID)
 	if !ok {
-		return "", 0, errors.Wrapf(err, "failed to get inserted id")
+		return store.ItemInfo{}, errors.Wrapf(err, "failed to get inserted id")
 	}
 
-	id := store.ID(oid.Hex())
-	log.Debugf("Added %s:{id:\"%s\",rev:1}", s.itemName, id)
-	return id, 1, nil
+	info.ID = store.ID(oid.Hex())
+	log.Debugf("Added %s:{id:\"%s\",rev:1}", s.itemName, info.ID)
+	return info, nil
 } //mongoStore.Add()
 
 func (s mongoStore) Get(id store.ID) (interface{}, store.ItemInfo, error) {
@@ -182,14 +192,14 @@ func (s mongoStore) GetInfo(id store.ID) (store.ItemInfo, error) {
 	return info, nil
 } //mongoStore.GetRev()
 
-func (s mongoStore) Upd(id store.ID, newData interface{}) (int, error) {
+func (s mongoStore) Upd(id store.ID, newData interface{}) (store.ItemInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	//get current item with header info
 	oldData, oldInfo, err := s.Get(id)
 	if err != nil {
-		return 0, errors.Wrapf(err, "cannot get item to upd")
+		return store.ItemInfo{}, errors.Wrapf(err, "cannot get item to upd")
 	}
 
 	objID, _ := primitive.ObjectIDFromHex(string(id))
@@ -207,12 +217,12 @@ func (s mongoStore) Upd(id store.ID, newData interface{}) (int, error) {
 				"data": oldData,
 			})
 		if err != nil {
-			return 0, errors.Wrapf(err, "failed to make copy of old item")
+			return store.ItemInfo{}, errors.Wrapf(err, "failed to make copy of old item")
 		}
 
 		oid, ok := insertResult.InsertedID.(primitive.ObjectID)
 		if !ok {
-			return 0, errors.Wrapf(err, "failed to get inserted id of rev copy")
+			return store.ItemInfo{}, errors.Wrapf(err, "failed to get inserted id of rev copy")
 		}
 		log.Debugf("Bak %s:{id:\"%s\",rev:%d} (mongo:_id:%s)", s.itemName, oldInfo.ID, oldInfo.Rev, oid)
 	} //scope
@@ -237,10 +247,10 @@ func (s mongoStore) Upd(id store.ID, newData interface{}) (int, error) {
 			},
 		})
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to upd rev=%d of id=%s: %v", newInfo.Rev, id, err)
+		return store.ItemInfo{}, errors.Wrapf(err, "failed to upd rev=%d of id=%s: %v", newInfo.Rev, id, err)
 	}
 	log.Debugf("Upd %s:{id:\"%s\",rev:%d}", s.itemName, newInfo.ID, newInfo.Rev)
-	return newInfo.Rev, nil
+	return newInfo, nil
 } //mongoStore.Upd()
 
 func (s mongoStore) Del(id store.ID) error {

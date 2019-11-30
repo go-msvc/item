@@ -18,14 +18,14 @@ func DoStoreTest(t *testing.T, c IStoreConfig) {
 
 	t0 := time.Now().Truncate(time.Millisecond) //mongo defaults to millisecond resolution
 	d1 := d{I: 12345, S: "67890", T: t0}
-	id, rev, err := s.Add(d1)
-	if err != nil || rev != 1 {
-		panic(errors.Wrapf(err, "failed to new: rev=%d, err=%v", rev, err))
+	info1, err := s.Add(d1)
+	if err != nil || info1.Rev != 1 {
+		panic(errors.Wrapf(err, "failed to new: rev=%d, err=%v", info1, err))
 	}
 
-	d2, info, err := s.Get(id)
-	if err != nil || info.Rev != 1 {
-		panic(errors.Wrapf(err, "failed to get: info=%+v, err=%v", info, err))
+	d2, info2, err := s.Get(info1.ID)
+	if err != nil || info2.Rev != 1 {
+		panic(errors.Wrapf(err, "failed to get: info=%+v, err=%v", info2, err))
 	}
 	if err := d1.Comp(d2.(d)); err != nil {
 		panic(errors.Wrapf(err, "new(%+v) != get(%+v)", d1, d2))
@@ -33,20 +33,20 @@ func DoStoreTest(t *testing.T, c IStoreConfig) {
 
 	t1 := time.Now().Truncate(time.Millisecond)
 	d3 := d{I: 22222, S: "22222", T: t1}
-	rev, err = s.Upd(id, d3)
-	if err != nil || rev != 2 {
-		panic(errors.Wrapf(err, "failed to upd: rev=%d, err=%v", rev, err))
+	info3, err := s.Upd(info1.ID, d3)
+	if err != nil || info3.ID != info1.ID || info3.Rev != 2 {
+		panic(errors.Wrapf(err, "failed to upd: rev=%d, err=%v", info3, err))
 	}
 
-	d4, info, err := s.Get(id)
-	if err != nil || info.Rev != 2 {
-		panic(errors.Wrapf(err, "failed to get: info=%+v, err=%v", info, err))
+	d4, info4, err := s.Get(info1.ID)
+	if err != nil || info4.ID != info1.ID || info4.ID != info3.ID || info4.Rev != 2 {
+		panic(errors.Wrapf(err, "failed to get: info=%+v, err=%v", info4, err))
 	}
 	if err := d3.Comp(d4.(d)); err != nil {
 		panic(errors.Wrapf(err, "new(%+v) != get(%+v)", d3, d4))
 	}
 
-	err = s.Del(id)
+	err = s.Del(info1.ID)
 	if err != nil {
 		panic(errors.Wrapf(err, "failed to del"))
 	}

@@ -52,8 +52,9 @@ func MustNew(tmpl interface{}) IStore {
 type IStore interface {
 	//singulat name of an item in this store (e.g. "user", "subscription", etc...)
 	Name() string
+	Type() reflect.Type
 
-	Add(v interface{}) (id ID, rev int, err error) //creates rev=1
+	Add(v interface{}) (info ItemInfo, err error) //creates rev=1
 
 	//Get the latest revision
 	Get(id ID) (v interface{}, info ItemInfo, err error)
@@ -62,7 +63,7 @@ type IStore interface {
 	GetInfo(id ID) (info ItemInfo, err error) //faster than Get(), only return header
 
 	//update to create a new revision (id will not change)
-	Upd(id ID, v interface{}) (rev int, err error)
+	Upd(id ID, v interface{}) (info ItemInfo, err error)
 
 	//Get a specific revision
 	//GetRev(id ID, rev int) (v interface{}, info ItemInfo, err error)

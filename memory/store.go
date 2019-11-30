@@ -23,43 +23,48 @@ func (c Config) New(itemName string, itemType reflect.Type) (store.IStore, error
 	return &memoryStore{
 		itemName: itemName,
 		itemType: itemType,
-		id:       make(map[store.ID][]item),
+		id:       make(map[store.ID][]memItem),
 	}, nil
 }
 
 type memoryStore struct {
 	itemName string
 	itemType reflect.Type
-	id       map[store.ID][]item
+	id       map[store.ID][]memItem
 }
 
-type item struct {
-	rev    int
-	ts     time.Time
-	userID store.ID
-	data   interface{}
+type memItem struct {
+	info store.ItemInfo
+	data interface{}
 }
 
 func (s memoryStore) Name() string {
 	return s.itemName
 }
 
-func (s *memoryStore) Add(v interface{}) (id store.ID, rev int, err error) {
+func (s memoryStore) Type() reflect.Type {
+	return s.itemType
+}
+
+func (s *memoryStore) Add(v interface{}) (info store.ItemInfo, err error) {
 	newID := store.ID(uuid.NewV1().String())
-	s.id[newID] = []item{item{rev: 1, ts: time.Now(), userID: "", data: v}}
-	return newID, 1, nil
+	item := memItem{
+		info: store.ItemInfo{
+			ID:        newID,
+			Rev:       1,
+			Timestamp: time.Now(),
+			UserID:    "",
+		}, data: v}
+
+	s.id[newID] = []memItem{item}
+	return item.info, nil
 }
 
 func (s memoryStore) Get(id store.ID) (interface{}, store.ItemInfo, error) {
 	if revs, ok := s.id[id]; ok {
 		nrRevs := len(revs)
-		lastRevItem := revs[nrRevs-1]
-		return lastRevItem.data, store.ItemInfo{
-			ID:        id,
-			Rev:       lastRevItem.rev,
-			Timestamp: lastRevItem.ts,
-			UserID:    lastRevItem.userID,
-		}, nil
+		lastRev := revs[nrRevs-1]
+		return lastRev.data, lastRev.info, nil
 	}
 	return nil, store.ItemInfo{}, errors.Errorf("id=%s not found", id)
 } //memoryStore.Get()
@@ -67,35 +72,30 @@ func (s memoryStore) Get(id store.ID) (interface{}, store.ItemInfo, error) {
 func (s memoryStore) GetInfo(id store.ID) (info store.ItemInfo, err error) {
 	if revs, ok := s.id[id]; ok {
 		nrRevs := len(revs)
-		lastRevItem := revs[nrRevs-1]
-		return store.ItemInfo{
-			ID:        id,
-			Rev:       lastRevItem.rev,
-			Timestamp: lastRevItem.ts,
-			UserID:    lastRevItem.userID,
-		}, nil
+		lastRev := revs[nrRevs-1]
+		return lastRev.info, nil
 	}
 	return store.ItemInfo{}, errors.Errorf("id=%s not found", id)
 }
 
-func (s memoryStore) Upd(id store.ID, v interface{}) (rev int, err error) {
+func (s memoryStore) Upd(id store.ID, v interface{}) (info store.ItemInfo, err error) {
 	revs, ok := s.id[id]
 	if !ok {
-		return 0, errors.Errorf("id:\"%s\" not found", id)
+		return store.ItemInfo{}, errors.Errorf("id:\"%s\" not found", id)
 	}
 
 	nrRevs := len(revs)
-	last := revs[nrRevs-1]
+	lastRev := revs[nrRevs-1]
 
 	//create new rev
-	newItem := last
-	newItem.rev = last.rev + 1
-	newItem.ts = time.Now()
+	newItem := lastRev
+	newItem.info.Rev = lastRev.info.Rev + 1
+	newItem.info.Timestamp = time.Now()
 	newItem.data = v
 	revs = append(revs, newItem)
 	s.id[id] = revs
 
-	return newItem.rev, nil
+	return newItem.info, nil
 }
 
 func (s memoryStore) Del(id store.ID) error {
