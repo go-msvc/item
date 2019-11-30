@@ -1,4 +1,4 @@
-package item
+package store
 
 //ID ...
 type ID string

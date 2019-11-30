@@ -1,4 +1,4 @@
-package item
+package store
 
 import (
 	"fmt"
@@ -19,8 +19,8 @@ type IStoreConfig interface {
 	New() IStore
 }
 
-//RegisterStore is called for each implementation
-func RegisterStore(name string, config IStoreConfig) {
+//Register is called for each implementation
+func Register(name string, config IStoreConfig) {
 	if len(name) == 0 {
 		panic("RegisterStore(name=\"\")")
 	}
@@ -32,7 +32,7 @@ func RegisterStore(name string, config IStoreConfig) {
 	}
 
 	storeConfigByName[name] = config
-} //RegisterStore()
+} //Register()
 
 var (
 	storeMutex        sync.Mutex
