@@ -78,6 +78,10 @@ func (s memoryStore) GetInfo(id store.ID) (info store.ItemInfo, err error) {
 	return store.ItemInfo{}, errors.Errorf("id=%s not found", id)
 }
 
+func (s memoryStore) GetBy(max int, key map[string]interface{}) (items []interface{}, info []store.ItemInfo, err error) {
+	return nil, nil, errors.Errorf("NYI")
+}
+
 func (s memoryStore) Upd(id store.ID, v interface{}) (info store.ItemInfo, err error) {
 	revs, ok := s.id[id]
 	if !ok {

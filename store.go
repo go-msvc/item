@@ -62,6 +62,9 @@ type IStore interface {
 	//Get info of the latest revision
 	GetInfo(id ID) (info ItemInfo, err error) //faster than Get(), only return header
 
+	//GetBy arbitrary key fields
+	GetBy(max int, key map[string]interface{}) (items []interface{}, info []ItemInfo, err error)
+
 	//update to create a new revision (id will not change)
 	Upd(id ID, v interface{}) (info ItemInfo, err error)
 

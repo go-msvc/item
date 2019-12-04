@@ -190,7 +190,49 @@ func (s mongoStore) GetInfo(id store.ID) (store.ItemInfo, error) {
 	}
 	log.Debugf("Got info for %s:{id:\"%s\",rev:%d}", s.itemName, info.ID, info.Rev)
 	return info, nil
-} //mongoStore.GetRev()
+} //mongoStore.GetInfo()
+
+func (s mongoStore) GetBy(max int, key map[string]interface{}) ([]interface{}, []store.ItemInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// objID, _ := primitive.ObjectIDFromHex(string(id))
+	// head := docHead{}
+
+	mongoKey := bson.M{}
+	for keyFieldName, keyFieldValue := range key {
+		mongoKey["data."+keyFieldName] = keyFieldValue
+	}
+
+	log.Debugf("GetBy(key:%+v)", mongoKey)
+	cur, err := s.collection.Find(ctx, mongoKey)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to find(%+v): %v", key, err)
+	}
+	defer cur.Close(ctx)
+
+	dataArray := make([]interface{}, 0)
+	infoArray := make([]store.ItemInfo, 0)
+	for cur.Next(ctx) && len(dataArray) < max {
+		docPtrValue := reflect.New(s.docType)
+		err := cur.Decode(docPtrValue.Interface())
+		if err != nil {
+			log.Errorf("failed to decode %s: %v", s.Name(), err)
+			continue
+		}
+
+		docValue := docPtrValue.Elem()
+		info := store.ItemInfo{
+			ID:        store.ID(docValue.Field(IDFieldIndex).Interface().(primitive.ObjectID).Hex()),
+			Rev:       docValue.Field(RevFieldIndex).Interface().(int),
+			Timestamp: docValue.Field(TimestampFieldIndex).Interface().(time.Time),
+			UserID:    store.ID(docValue.Field(UserIDFieldIndex).Interface().(primitive.ObjectID).Hex()),
+		}
+		dataArray = append(dataArray, docValue.Field(DataFieldIndex).Interface())
+		infoArray = append(infoArray, info)
+	} //for each doc
+	return dataArray, infoArray, nil
+} //mongoStore.GetBy()
 
 func (s mongoStore) Upd(id store.ID, newData interface{}) (store.ItemInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
